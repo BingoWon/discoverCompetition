@@ -7,11 +7,13 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Cloudflare Workers
+# Cloudflare Workers - NO LOCAL DEVELOPMENT
 .wrangler/
 .dev.vars
 .mf/
 worker/
+wrangler.toml.local
+*.local
 
 # Environment variables and secrets
 .env
