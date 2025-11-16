@@ -31,14 +31,14 @@ wrangler deployments list
 All configuration is in `wrangler.toml` and Cloudflare dashboard:
 
 - **KV Namespace**: `COMPETITION_KV` (ID: 7fee0107eb3746e9b595888b802b9a9b)
-- **Cron Schedule**: Every minute (`* * * * *`)
+- **Cron Schedule**: Every hour (`0 * * * *`)
 - **Secrets** (set via Cloudflare dashboard):
   - `TELEGRAM_BOT_TOKEN`
   - `TELEGRAM_CHAT_ID`
 
 ## How It Works
 
-1. **Scheduled Trigger**: Runs every minute via cron
+1. **Scheduled Trigger**: Runs every hour via cron
 2. **Fetch**: Downloads CompeteHub competitions page
 3. **Extract**: Parses React Server Components (RSC) data
 4. **Filter**: Checks KV store for previously seen competitions
