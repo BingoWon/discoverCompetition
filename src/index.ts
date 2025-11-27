@@ -300,6 +300,8 @@ async function storeSeen(env: Env, competitions: Competition[]): Promise<void> {
   await Promise.all(ops);
 }
 
+const TELEGRAM_MAX_LENGTH = 4096;
+
 async function notifyTelegram(env: Env, competitions: Competition[]): Promise<void> {
   const token = env.TELEGRAM_BOT_TOKEN;
   const chatId = env.TELEGRAM_CHAT_ID;
@@ -310,13 +312,79 @@ async function notifyTelegram(env: Env, competitions: Competition[]): Promise<vo
   }
 
   const baseUrl = env.COMPETITION_PAGE_BASE ?? DEFAULT_COMPETITION_PAGE_BASE;
-  const lines = competitions.map((comp) => formatCompetition(comp, baseUrl));
-  const message = `发现 ${competitions.length} 个新竞赛：\n\n${lines.join("\n\n")}`;
+  const messages = buildTelegramMessages(competitions, baseUrl);
 
+  console.log(`Splitting ${competitions.length} competitions into ${messages.length} message(s)`);
+
+  for (let i = 0; i < messages.length; i++) {
+    await sendTelegramMessage(token, chatId, messages[i]);
+    console.log(`Sent message ${i + 1}/${messages.length} (${messages[i].length} chars)`);
+
+    // Small delay between messages to avoid rate limiting
+    if (i < messages.length - 1) {
+      await sleep(100);
+    }
+  }
+}
+
+function buildTelegramMessages(competitions: Competition[], baseUrl: string): string[] {
+  const messages: string[] = [];
+  const totalCount = competitions.length;
+
+  let currentBatch: string[] = [];
+  let currentLength = 0;
+
+  for (let i = 0; i < competitions.length; i++) {
+    const formatted = formatCompetition(competitions[i], baseUrl);
+
+    // Calculate what the header would be for this batch
+    const batchStart = i - currentBatch.length + 1;
+    const headerTemplate = `发现 ${totalCount} 个新竞赛（${batchStart}-${i + 1}/${totalCount}）：\n\n`;
+    const separator = "\n\n";
+
+    // Check if adding this competition would exceed the limit
+    const wouldBeLength =
+      headerTemplate.length +
+      currentBatch.map((b) => b.length).reduce((a, b) => a + b, 0) +
+      (currentBatch.length > 0 ? separator.length * currentBatch.length : 0) +
+      formatted.length;
+
+    if (wouldBeLength > TELEGRAM_MAX_LENGTH && currentBatch.length > 0) {
+      // Finalize current batch
+      const batchEnd = i;
+      const header =
+        totalCount === currentBatch.length
+          ? `发现 ${totalCount} 个新竞赛：\n\n`
+          : `发现 ${totalCount} 个新竞赛（${batchStart}-${batchEnd}/${totalCount}）：\n\n`;
+      messages.push(header + currentBatch.join("\n\n"));
+
+      // Start new batch
+      currentBatch = [formatted];
+      currentLength = formatted.length;
+    } else {
+      currentBatch.push(formatted);
+      currentLength = wouldBeLength;
+    }
+  }
+
+  // Don't forget the last batch
+  if (currentBatch.length > 0) {
+    const batchStart = competitions.length - currentBatch.length + 1;
+    const header =
+      messages.length === 0
+        ? `发现 ${totalCount} 个新竞赛：\n\n`
+        : `发现 ${totalCount} 个新竞赛（${batchStart}-${totalCount}/${totalCount}）：\n\n`;
+    messages.push(header + currentBatch.join("\n\n"));
+  }
+
+  return messages;
+}
+
+async function sendTelegramMessage(token: string, chatId: string, text: string): Promise<void> {
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   const params = new URLSearchParams({
     chat_id: chatId,
-    text: message,
+    text: text,
     parse_mode: "MarkdownV2",
     disable_web_page_preview: "true",
   });
@@ -332,6 +400,10 @@ async function notifyTelegram(env: Env, competitions: Competition[]): Promise<vo
     console.error("Telegram notification failed", response.status, body);
     throw new Error(`Failed to send Telegram notification (${response.status})`);
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function formatCompetition(comp: Competition, baseUrl: string): string {

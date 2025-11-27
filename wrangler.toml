@@ -16,3 +16,4 @@ COMPETITION_PAGE_BASE = "https://www.competehub.dev/competitions/"
 
 [observability]
 enabled = true
+head_sampling_rate = 1
