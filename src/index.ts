@@ -223,18 +223,43 @@ function unescapeUnicode(input: string): string {
 }
 
 function parseCompetitionJson(raw: string): any {
+  // Remove/escape control characters that break JSON.parse
+  const sanitized = sanitizeJsonString(raw);
+  const normalized = sanitized.replace(/\\"/g, '"');
+
   try {
-    const normalized = raw.replace(/\\"/g, '"');
     return JSON.parse(normalized);
   } catch (error) {
-    const buf = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; i++) {
-      buf[i] = raw.charCodeAt(i);
+    // Fallback: try decoding as UTF-8
+    const buf = new Uint8Array(normalized.length);
+    for (let i = 0; i < normalized.length; i++) {
+      buf[i] = normalized.charCodeAt(i);
     }
     const decoded = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-    const normalized = decoded.replace(/\\"/g, '"');
-    return JSON.parse(normalized);
+    return JSON.parse(decoded);
   }
+}
+
+function sanitizeJsonString(input: string): string {
+  // Replace unescaped control characters (0x00-0x1F) with escaped versions or remove them
+  // These characters are invalid in JSON strings unless properly escaped
+  return input.replace(/[\x00-\x1F]/g, (char) => {
+    switch (char) {
+      case "\n":
+        return "\\n";
+      case "\r":
+        return "\\r";
+      case "\t":
+        return "\\t";
+      case "\b":
+        return "\\b";
+      case "\f":
+        return "\\f";
+      default:
+        // Other control characters: escape as unicode or remove
+        return "";
+    }
+  });
 }
 
 function extractJsonBlock(source: string, startIndex: number): string | null {
