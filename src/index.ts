@@ -339,7 +339,7 @@ function buildTelegramMessages(competitions: Competition[], baseUrl: string): st
 
     // Calculate what the header would be for this batch
     const batchStart = i - currentBatch.length + 1;
-    const headerTemplate = `发现 ${totalCount} 个新竞赛（${batchStart}-${i + 1}/${totalCount}）：\n\n`;
+    const headerTemplate = buildHeader(totalCount, batchStart, i + 1);
     const separator = "\n\n";
 
     // Check if adding this competition would exceed the limit
@@ -354,8 +354,8 @@ function buildTelegramMessages(competitions: Competition[], baseUrl: string): st
       const batchEnd = i;
       const header =
         totalCount === currentBatch.length
-          ? `发现 ${totalCount} 个新竞赛：\n\n`
-          : `发现 ${totalCount} 个新竞赛（${batchStart}-${batchEnd}/${totalCount}）：\n\n`;
+          ? buildHeader(totalCount)
+          : buildHeader(totalCount, batchStart, batchEnd);
       messages.push(header + currentBatch.join("\n\n"));
 
       // Start new batch
@@ -372,12 +372,19 @@ function buildTelegramMessages(competitions: Competition[], baseUrl: string): st
     const batchStart = competitions.length - currentBatch.length + 1;
     const header =
       messages.length === 0
-        ? `发现 ${totalCount} 个新竞赛：\n\n`
-        : `发现 ${totalCount} 个新竞赛（${batchStart}-${totalCount}/${totalCount}）：\n\n`;
+        ? buildHeader(totalCount)
+        : buildHeader(totalCount, batchStart, totalCount);
     messages.push(header + currentBatch.join("\n\n"));
   }
 
   return messages;
+}
+
+function buildHeader(total: number, start?: number, end?: number): string {
+  if (start !== undefined && end !== undefined) {
+    return `发现 ${total} 个新竞赛（${start}\\-${end}/${total}）：\n\n`;
+  }
+  return `发现 ${total} 个新竞赛：\n\n`;
 }
 
 async function sendTelegramMessage(token: string, chatId: string, text: string): Promise<void> {
@@ -411,9 +418,9 @@ function formatCompetition(comp: Competition, baseUrl: string): string {
   const title = escapeMarkdown(comp.title);
   const prize = escapeMarkdown(comp.prize || "未知");
   const timeLeft = escapeMarkdown(comp.timeLeft || "未知");
-  const description = comp.description ? escapeMarkdown(trimDescription(comp.description)) : "-";
+  const description = comp.description ? escapeMarkdown(trimDescription(comp.description)) : "\\-";
   const tags =
-    comp.tags.length > 0 ? comp.tags.map((tag) => `\`${escapeMarkdown(tag)}\``).join(" ") : "-";
+    comp.tags.length > 0 ? comp.tags.map((tag) => `\`${escapeMarkdown(tag)}\``).join(" ") : "\\-";
 
   return [
     `• [${title}](${link})`,
